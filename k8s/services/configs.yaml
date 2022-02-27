@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-configs
+data:
+  db_name: microservices
+  db_host: first-cluster.3vorc.mongodb.net

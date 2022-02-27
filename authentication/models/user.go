@@ -1,21 +1,21 @@
 package models
 
 import (
-	"gopkg.in/mgo.v2/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"microservices/pb"
 	"time"
 )
 
 type User struct {
-	Id       bson.ObjectId `bson:"_id,"`
-	Email    string        `json:"email"`
-	Name     string        `json:"name"`
-	Password string        `json:"password"`
-	Created  time.Time     `json:"created"`
-	Updated  time.Time     `json:"updated"`
+	Id       primitive.ObjectID `bson:"_id,"`
+	Email    string             `json:"email"`
+	Name     string             `json:"name"`
+	Password string             `json:"password"`
+	Created  time.Time          `json:"created"`
+	Updated  time.Time          `json:"updated"`
 }
 
-func (u *User) toProtoBuffer() *pb.User {
+func (u *User) ToProtoBuffer() *pb.User {
 	return &pb.User{
 		Id:       u.Id.Hex(),
 		Name:     u.Name,
@@ -26,8 +26,12 @@ func (u *User) toProtoBuffer() *pb.User {
 	}
 }
 
-func (u *User) fromProtocol(user *pb.User) {
-	u.Id = bson.ObjectIdHex(user.GetId())
+func (u *User) FromProtocol(user *pb.User) {
+	hex, err := primitive.ObjectIDFromHex(user.GetId())
+	if err != nil {
+		panic(err)
+	}
+	u.Id = hex
 	u.Email = user.GetEmail()
 	u.Name = user.GetName()
 	u.Password = user.GetPassword()

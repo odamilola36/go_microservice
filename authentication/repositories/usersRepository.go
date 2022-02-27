@@ -1,67 +1,77 @@
 package repositories
 
 import (
-	"gopkg.in/mgo.v2"
-	"gopkg.in/mgo.v2/bson"
+	"context"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"microservices/authentication/models"
-	"microservices/db"
+	"microservices/dbCon"
 )
 
 const userCollection = "users"
 
 type UserRepository interface {
-	save(user *models.User) error
-	getById(id string) (models.User, error)
-	getByEmail(email string) (models.User, error)
-	getAll() ([]models.User, error)
-	updateUser(u *models.User) error
-	deleteUser(id string) error
-	deleteAll() error
+	Save(user *models.User) error
+	GetById(id string) (models.User, error)
+	GetByEmail(email string) (models.User, error)
+	GetAll() ([]models.User, error)
+	UpdateUser(u *models.User) error
+	DeleteUser(id string) error
+	DeleteAll() error
 }
 
 type usersRepository struct {
-	c *mgo.Collection
+	c         *mongo.Collection
+	dbContext context.Context
 }
 
-func NewUsersRepository(c db.Connection) UserRepository {
+func NewUsersRepository(c dbCon.Connection) UserRepository {
 	return &usersRepository{
-		c: c.DB().C(userCollection),
+		c:         c.DB().Collection(userCollection),
+		dbContext: c.DBContext(),
 	}
 }
 
-func (r *usersRepository) save(user *models.User) error {
-	return r.c.Insert(user)
+func (r *usersRepository) Save(user *models.User) error {
+	_, err := r.c.InsertOne(r.dbContext, user)
+	return err
 }
 
-func (r *usersRepository) getById(id string) (models.User, error) {
+func (r *usersRepository) GetById(id string) (models.User, error) {
 	var user models.User
-	err := r.c.FindId(bson.ObjectIdHex(id)).One(&user)
+	hex, _ := primitive.ObjectIDFromHex(id)
+	err := r.c.FindOne(r.dbContext, bson.M{"_id": hex}).Decode(&user)
 	return user, err
 }
 
-func (r *usersRepository) getByEmail(email string) (models.User, error) {
+func (r *usersRepository) GetByEmail(email string) (models.User, error) {
 	var user models.User
-	err := r.c.Find(bson.M{"email": email}).One(&user)
+	err := r.c.FindOne(r.dbContext, bson.M{"email": email}).Decode(&user)
 	return user, err
 }
 
-func (r *usersRepository) getAll() ([]models.User, error) {
+func (r *usersRepository) GetAll() ([]models.User, error) {
 	var user []models.User
-	err := r.c.FindId(bson.M{}).One(&user)
+	cursor, err := r.c.Find(r.dbContext, nil)
+	err = cursor.All(nil, &user)
+	if err != nil {
+		return nil, err
+	}
 	return user, err
 }
 
-func (r *usersRepository) updateUser(u *models.User) error {
-	var err = r.c.UpdateId(bson.M{"_id": u.Id}, u)
+func (r *usersRepository) UpdateUser(u *models.User) error {
+	var _, err = r.c.UpdateOne(r.dbContext, bson.M{"_id": u.Id}, bson.M{"$set": u})
 	return err
 }
 
-func (r *usersRepository) deleteUser(id string) error {
-	var err = r.c.Remove(bson.M{"_id": bson.ObjectIdHex(id)})
+func (r *usersRepository) DeleteUser(id string) error {
+	hex, _ := primitive.ObjectIDFromHex(id)
+	var _, err = r.c.DeleteOne(r.dbContext, bson.M{"_id": hex})
 	return err
 }
 
-func (r *usersRepository) deleteAll() error {
-	err := r.c.DropCollection()
-	return err
+func (r *usersRepository) DeleteAll() error {
+	return r.c.Drop(r.dbContext)
 }
